@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dismako_app
+    restart: always
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-dismako_super_secret_jwt_key_2026}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-dismako}:${POSTGRES_PASSWORD:-dismako123}@postgres:5432/${POSTGRES_DB:-dismako_db}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: dismako_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dismako}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dismako123}
+      POSTGRES_DB: ${POSTGRES_DB:-dismako_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dismako} -d ${POSTGRES_DB:-dismako_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
