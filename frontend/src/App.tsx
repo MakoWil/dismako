@@ -56,7 +56,7 @@ export const App: React.FC = () => {
   if (activeRoom) {
     return (
       <div className="app-container">
-        <VoiceRoom user={user} room={activeRoom} onLeaveRoom={handleLeaveRoom} />
+        <VoiceRoom user={user} token={token} room={activeRoom} onLeaveRoom={handleLeaveRoom} onSwitchRoom={handleJoinRoom} />
       </div>
     );
   }

@@ -16,6 +16,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
   const [activeScreenShare, setActiveScreenShare] = useState<{ socketId: string; username: string; stream: MediaStream } | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [displayNickname, setDisplayNickname] = useState(currentUser.username);
 
   // Refs para evitar problemas com closures desatualizados em listeners de evento
   const activeScreenShareRef = useRef(activeScreenShare);
@@ -77,21 +78,18 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
       peerConnections.current.set(targetSocketId, pc);
 
       const audioStream = localAudioStreamRef.current;
-      // Adicionar tracks de áudio local ao peer connection
       if (audioStream) {
         audioStream.getTracks().forEach(track => {
           pc.addTrack(track, audioStream);
         });
       }
 
-      // Se houver compartilhamento de tela ativo, adicionar track de vídeo
       if (screenShareStreamRef.current) {
         screenShareStreamRef.current.getTracks().forEach(track => {
           pc.addTrack(track, screenShareStreamRef.current!);
         });
       }
 
-      // Enviar ICE Candidates para o parceiro
       pc.onicecandidate = event => {
         if (event.candidate && socket) {
           socket.emit('ice-candidate', {
@@ -101,7 +99,6 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
         }
       };
 
-      // Receber stream remoto (áudio / vídeo)
       pc.ontrack = event => {
         const [remoteStream] = event.streams;
         if (remoteStream) {
@@ -111,7 +108,6 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
             prev.map(p => (p.socketId === targetSocketId ? { ...p, stream: remoteStream } : p))
           );
 
-          // Verificar se a track é de vídeo (transmissão de tela)
           if (event.track.kind === 'video') {
             const p = participantsRef.current.find(part => part.socketId === targetSocketId);
             setActiveScreenShare({
@@ -123,7 +119,6 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
         }
       };
 
-      // Se for o iniciador da conexão, cria e envia a Oferta SDP
       if (isInitiator && socket) {
         pc.createOffer()
           .then(offer => pc.setLocalDescription(offer))
@@ -141,12 +136,11 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
     [socket]
   );
 
-  // Efeito principal de tratamento de eventos via Socket.io
   useEffect(() => {
     if (!socket || !roomId || !currentUser) return;
 
     socket.connect();
-    socket.emit('join-room', { roomId, user: currentUser });
+    socket.emit('join-room', { roomId, user: { ...currentUser, username: displayNickname } });
 
     const handleRoomUsers = (users: Participant[]) => {
       setParticipants(users);
@@ -199,6 +193,10 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
       setParticipants(prev => prev.map(p => (p.socketId === socketId ? { ...p, isSpeaking: speaking } : p)));
     };
 
+    const handleUserNicknameChanged = ({ socketId, newUsername }: { socketId: string; newUsername: string }) => {
+      setParticipants(prev => prev.map(p => (p.socketId === socketId ? { ...p, username: newUsername } : p)));
+    };
+
     const handleUserStartedScreenShare = ({ socketId }: { socketId: string }) => {
       setParticipants(prev => prev.map(p => (p.socketId === socketId ? { ...p, isScreenSharing: true } : p)));
     };
@@ -229,6 +227,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
     socket.on('ice-candidate', handleIceCandidate);
     socket.on('user-audio-changed', handleUserAudioChanged);
     socket.on('user-speaking-changed', handleUserSpeakingChanged);
+    socket.on('user-nickname-changed', handleUserNicknameChanged);
     socket.on('user-started-screen-share', handleUserStartedScreenShare);
     socket.on('user-stopped-screen-share', handleUserStoppedScreenShare);
     socket.on('user-left', handleUserLeft);
@@ -241,6 +240,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
       socket.off('ice-candidate', handleIceCandidate);
       socket.off('user-audio-changed', handleUserAudioChanged);
       socket.off('user-speaking-changed', handleUserSpeakingChanged);
+      socket.off('user-nickname-changed', handleUserNicknameChanged);
       socket.off('user-started-screen-share', handleUserStartedScreenShare);
       socket.off('user-stopped-screen-share', handleUserStoppedScreenShare);
       socket.off('user-left', handleUserLeft);
@@ -249,7 +249,16 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
       peerConnections.current.clear();
       socket.disconnect();
     };
-  }, [socket, roomId, currentUser, createPeerConnection]);
+  }, [socket, roomId, currentUser, createPeerConnection, displayNickname]);
+
+  // Alterar Apelido
+  const changeNickname = (newNickname: string) => {
+    if (newNickname.trim()) {
+      const trimmed = newNickname.trim();
+      setDisplayNickname(trimmed);
+      socket?.emit('change-nickname', { newNickname: trimmed });
+    }
+  };
 
   // Alternar Mute
   const toggleMute = () => {
@@ -297,11 +306,10 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
 
       setActiveScreenShare({
         socketId: socket?.id || 'local',
-        username: `${currentUser.username} (Sua Transmissão)`,
+        username: `${displayNickname} (Sua Transmissão)`,
         stream: displayStream,
       });
 
-      // Adicionar track de vídeo aos peers ativos
       const videoTrack = displayStream.getVideoTracks()[0];
       peerConnections.current.forEach(pc => {
         pc.addTrack(videoTrack, displayStream);
@@ -309,7 +317,6 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
 
       socket?.emit('start-screen-share');
 
-      // Listener nativo do navegador quando o usuário clica em "Parar de compartilhar"
       videoTrack.onended = () => {
         stopScreenShare();
       };
@@ -325,6 +332,8 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
     activeScreenShare,
     isMuted,
     isSpeaking,
+    displayNickname,
+    changeNickname,
     toggleMute,
     setSpeakingState,
     startScreenShare,

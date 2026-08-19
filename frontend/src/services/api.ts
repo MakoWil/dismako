@@ -35,6 +35,22 @@ export async function createRoomApi(token: string, name?: string): Promise<{ roo
   return data;
 }
 
+export async function listRoomsApi(token: string): Promise<{ rooms: Room[] }> {
+  const response = await fetch(`${API_BASE}/rooms`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Erro ao carregar lista de salas');
+  }
+
+  return data;
+}
+
 export async function getRoomApi(token: string, roomIdOrCode: string): Promise<{ room: Room }> {
   const response = await fetch(`${API_BASE}/rooms/${roomIdOrCode}`, {
     method: 'GET',

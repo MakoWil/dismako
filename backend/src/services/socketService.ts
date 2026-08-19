@@ -88,6 +88,17 @@ export function setupSocketService(io: SocketIOServer): void {
       }
     });
 
+    // Alterar Apelido (Nickname) em tempo real
+    socket.on('change-nickname', ({ newNickname }: { newNickname: string }) => {
+      if (currentRoomId && currentUser && newNickname?.trim()) {
+        currentUser.username = newNickname.trim();
+        io.to(currentRoomId).emit('user-nickname-changed', {
+          socketId: socket.id,
+          newUsername: currentUser.username,
+        });
+      }
+    });
+
     // Estado do Indicador Visual de Fala
     socket.on('speaking-state', ({ isSpeaking }: { isSpeaking: boolean }) => {
       if (currentRoomId && currentUser) {

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { createRoomApi, getRoomApi } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { createRoomApi, getRoomApi, listRoomsApi } from '../services/api';
 import { Room, User } from '../types';
 
 interface RoomLobbyProps {
@@ -10,11 +10,24 @@ interface RoomLobbyProps {
 }
 
 export const RoomLobby: React.FC<RoomLobbyProps> = ({ user, token, onJoinRoom, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
+  const [activeTab, setActiveTab] = useState<'list' | 'create' | 'join'>('list');
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [roomName, setRoomName] = useState(`Sala do ${user.username}`);
   const [inputCode, setInputCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadRooms() {
+      try {
+        const data = await listRoomsApi(token);
+        setAvailableRooms(data.rooms);
+      } catch (err) {
+        console.warn('Erro ao carregar salas:', err);
+      }
+    }
+    loadRooms();
+  }, [token]);
 
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +81,12 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({ user, token, onJoinRoom, o
 
         <div className="lobby-tabs">
           <button
+            className={`lobby-tab ${activeTab === 'list' ? 'active' : ''}`}
+            onClick={() => setActiveTab('list')}
+          >
+            Salas Disponíveis ({availableRooms.length})
+          </button>
+          <button
             className={`lobby-tab ${activeTab === 'create' ? 'active' : ''}`}
             onClick={() => setActiveTab('create')}
           >
@@ -77,13 +96,48 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({ user, token, onJoinRoom, o
             className={`lobby-tab ${activeTab === 'join' ? 'active' : ''}`}
             onClick={() => setActiveTab('join')}
           >
-            Entrar em Sala
+            Código da Sala
           </button>
         </div>
 
         {error && <div className="auth-error">{error}</div>}
 
-        {activeTab === 'create' ? (
+        {activeTab === 'list' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+            {availableRooms.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0' }}>
+                Nenhuma sala encontrada. Crie uma nova sala para começar!
+              </div>
+            ) : (
+              availableRooms.map(room => (
+                <div
+                  key={room.id}
+                  style={{
+                    padding: '12px 16px',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    borderRadius: 'var(--radius-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    transition: 'var(--transition)',
+                  }}
+                  onClick={() => onJoinRoom(room)}
+                >
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '15px' }}>🔊 {room.name}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Por {room.createdBy} • #{room.code}</div>
+                  </div>
+                  <button className="btn btn-brand" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                    Entrar
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === 'create' && (
           <form onSubmit={handleCreateRoom}>
             <div className="form-group">
               <label className="form-label">Nome da Sala</label>
@@ -100,7 +154,9 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({ user, token, onJoinRoom, o
               {loading ? 'Criando...' : 'Criar Sala Nova'}
             </button>
           </form>
-        ) : (
+        )}
+
+        {activeTab === 'join' && (
           <form onSubmit={handleJoinRoom}>
             <div className="form-group">
               <label className="form-label">ID ou Código da Sala</label>

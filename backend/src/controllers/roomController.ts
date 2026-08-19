@@ -45,6 +45,29 @@ export async function createRoomController(req: AuthenticatedRequest, res: Respo
   });
 }
 
+export async function listRoomsController(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const roomsMap = new Map<string, { id: string; code: string; name: string; createdBy: string; createdAt: Date }>();
+
+  // Adiciona salas ativas da memória
+  activeRoomsInMemory.forEach((room) => {
+    roomsMap.set(room.id, room);
+  });
+
+  try {
+    const dbRooms = await prisma.room.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    });
+    dbRooms.forEach((room) => {
+      roomsMap.set(room.id, room);
+    });
+  } catch (e) {
+    // Fallback se banco offline em dev
+  }
+
+  res.json({ rooms: Array.from(roomsMap.values()) });
+}
+
 export async function getRoomController(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { roomIdOrCode } = req.params;
 

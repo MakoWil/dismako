@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Room, User } from '../types';
 import { getSocket } from '../services/socket';
 import { useWebRTC } from '../hooks/useWebRTC';
@@ -7,15 +7,19 @@ import { ParticipantList } from './ParticipantList';
 import { VideoGrid } from './VideoGrid';
 import { Controls } from './Controls';
 import { AudioPlayer } from './AudioPlayer';
+import { listRoomsApi } from '../services/api';
 
 interface VoiceRoomProps {
   user: User;
+  token: string;
   room: Room;
   onLeaveRoom: () => void;
+  onSwitchRoom: (room: Room) => void;
 }
 
-export const VoiceRoom: React.FC<VoiceRoomProps> = ({ user, room, onLeaveRoom }) => {
+export const VoiceRoom: React.FC<VoiceRoomProps> = ({ user, token, room, onLeaveRoom, onSwitchRoom }) => {
   const socket = useMemo(() => getSocket(), []);
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
 
   const {
     localAudioStream,
@@ -23,11 +27,28 @@ export const VoiceRoom: React.FC<VoiceRoomProps> = ({ user, room, onLeaveRoom })
     activeScreenShare,
     isMuted,
     isSpeaking,
+    displayNickname,
+    changeNickname,
     toggleMute,
     setSpeakingState,
     startScreenShare,
     stopScreenShare,
   } = useWebRTC(socket, room.id, user);
+
+  // Carregar lista de salas disponíveis
+  useEffect(() => {
+    async function loadRooms() {
+      try {
+        const data = await listRoomsApi(token);
+        setAvailableRooms(data.rooms);
+      } catch (err) {
+        console.warn('Erro ao listar salas:', err);
+      }
+    }
+    loadRooms();
+    const interval = setInterval(loadRooms, 5000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   // Hook de análise de áudio para indicador de fala
   useAudioAnalyser(localAudioStream, setSpeakingState, isMuted);
@@ -54,7 +75,7 @@ export const VoiceRoom: React.FC<VoiceRoomProps> = ({ user, room, onLeaveRoom })
         <AudioPlayer key={p.socketId} participant={p} />
       ))}
 
-      {/* Sidebar com Dados da Sala e Participantes */}
+      {/* Sidebar com Dados da Sala e Lista de Canais/Participantes */}
       <div className="sidebar">
         <div className="sidebar-header">
           <span>🔊 {room.name}</span>
@@ -65,16 +86,21 @@ export const VoiceRoom: React.FC<VoiceRoomProps> = ({ user, room, onLeaveRoom })
 
         <ParticipantList
           currentUser={user}
+          displayNickname={displayNickname}
+          onChangeNickname={changeNickname}
           participants={participants}
           localIsMuted={isMuted}
           localIsSpeaking={isSpeaking}
+          availableRooms={availableRooms}
+          currentRoomId={room.id}
+          onSelectRoom={onSwitchRoom}
         />
       </div>
 
       {/* Palco Principal (Grid de Vídeo / Transmissão & Controles) */}
       <div className="main-stage">
         <VideoGrid
-          currentUser={user}
+          currentUser={{ ...user, username: displayNickname }}
           participants={participants}
           activeScreenShare={activeScreenShare}
           localIsSpeaking={isSpeaking}
