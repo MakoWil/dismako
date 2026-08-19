@@ -285,6 +285,26 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
   // Stop Screen Share interno
   const stopScreenShare = useCallback(() => {
     if (screenShareStreamRef.current) {
+      const videoTrack = screenShareStreamRef.current.getVideoTracks()[0];
+      peerConnections.current.forEach((pc, targetSocketId) => {
+        const senders = pc.getSenders();
+        senders.forEach(sender => {
+          if (sender.track && sender.track.kind === 'video') {
+            pc.removeTrack(sender);
+          }
+        });
+        // Renegociação SDP para remover vídeo
+        pc.createOffer()
+          .then(offer => pc.setLocalDescription(offer))
+          .then(() => {
+            socket?.emit('offer', {
+              toSocketId: targetSocketId,
+              offer: pc.localDescription,
+            });
+          })
+          .catch(err => console.error('Erro ao renegociar fechamento de tela:', err));
+      });
+
       screenShareStreamRef.current.getTracks().forEach(track => track.stop());
       setScreenShareStream(null);
       screenShareStreamRef.current = null;
@@ -311,8 +331,19 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
       });
 
       const videoTrack = displayStream.getVideoTracks()[0];
-      peerConnections.current.forEach(pc => {
+      
+      // Adicionar vídeo aos peers e renegociar SDP
+      peerConnections.current.forEach((pc, targetSocketId) => {
         pc.addTrack(videoTrack, displayStream);
+        pc.createOffer()
+          .then(offer => pc.setLocalDescription(offer))
+          .then(() => {
+            socket?.emit('offer', {
+              toSocketId: targetSocketId,
+              offer: pc.localDescription,
+            });
+          })
+          .catch(err => console.error('Erro ao renegociar transmissão de tela:', err));
       });
 
       socket?.emit('start-screen-share');

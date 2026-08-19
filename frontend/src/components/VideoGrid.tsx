@@ -21,6 +21,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
   useEffect(() => {
     if (featuredVideoRef.current && activeScreenShare?.stream) {
       featuredVideoRef.current.srcObject = activeScreenShare.stream;
+      featuredVideoRef.current.play().catch(err => console.warn('Erro ao dar play no vídeo:', err));
     }
   }, [activeScreenShare]);
 
@@ -44,7 +45,12 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
             <span>{activeScreenShare.username}</span>
           </div>
 
-          <video ref={featuredVideoRef} autoPlay playsInline muted />
+          <video
+            ref={featuredVideoRef}
+            autoPlay
+            playsInline
+            muted={activeScreenShare.socketId === 'local'}
+          />
 
           <button className="fullscreen-btn" onClick={handleFullscreen}>
             ⛶ Tela Cheia
@@ -65,7 +71,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
         </div>
 
         {/* Cards dos outros Usuários */}
-        {participants.map((p) => (
+        {participants.map(p => (
           <div key={p.socketId} className={`voice-card ${p.isSpeaking && !p.isMuted ? 'speaking' : ''}`}>
             <div className={`avatar-wrapper ${p.isSpeaking && !p.isMuted ? 'speaking' : ''}`} style={{ width: '64px', height: '64px', fontSize: '24px' }}>
               {p.username.charAt(0).toUpperCase()}
