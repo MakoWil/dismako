@@ -1,0 +1,14 @@
+# Ignored files as requested in guia.MD
+guia.MD
+log.md
+
+# Dependencies & Build artifacts
+node_modules
+dist
+.env
+*.log
+
+# IDE & System
+.DS_Store
+.vscode
+.idea
