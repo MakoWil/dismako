@@ -1,19 +1,28 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export function useAudioAnalyser(
   stream: MediaStream | null,
   onSpeakingChange: (isSpeaking: boolean) => void,
   isMuted: boolean
 ) {
+  const speakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSpeakingRef = useRef<boolean>(false);
+
   useEffect(() => {
     if (!stream || isMuted) {
-      onSpeakingChange(false);
+      if (isSpeakingRef.current) {
+        isSpeakingRef.current = false;
+        onSpeakingChange(false);
+      }
       return;
     }
 
     const audioTracks = stream.getAudioTracks();
     if (audioTracks.length === 0) {
-      onSpeakingChange(false);
+      if (isSpeakingRef.current) {
+        isSpeakingRef.current = false;
+        onSpeakingChange(false);
+      }
       return;
     }
 
@@ -26,7 +35,7 @@ export function useAudioAnalyser(
       audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.4;
+      analyser.smoothingTimeConstant = 0.5;
 
       source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
@@ -34,7 +43,8 @@ export function useAudioAnalyser(
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
 
-      let currentlySpeaking = false;
+      const SPEAKING_THRESHOLD = 18; // Volume mínimo para considerar fala
+      const SILENCE_HANGOVER_MS = 400; // Tempo de retenção (evita piscadas rápidas)
 
       const checkAudioLevel = () => {
         if (!analyser) return;
@@ -46,12 +56,26 @@ export function useAudioAnalyser(
         }
         const average = sum / bufferLength;
 
-        // Limiar de detecção de fala (volume médio > 15)
-        const isSpeakingNow = average > 15;
+        if (average > SPEAKING_THRESHOLD) {
+          // Se detectou fala, cancela o timer de silêncio
+          if (speakingTimeoutRef.current) {
+            clearTimeout(speakingTimeoutRef.current);
+            speakingTimeoutRef.current = null;
+          }
 
-        if (isSpeakingNow !== currentlySpeaking) {
-          currentlySpeaking = isSpeakingNow;
-          onSpeakingChange(isSpeakingNow);
+          if (!isSpeakingRef.current) {
+            isSpeakingRef.current = true;
+            onSpeakingChange(true);
+          }
+        } else {
+          // Se caiu abaixo do limiar, aguarda o tempo de retenção antes de desligar a fala
+          if (isSpeakingRef.current && !speakingTimeoutRef.current) {
+            speakingTimeoutRef.current = setTimeout(() => {
+              isSpeakingRef.current = false;
+              onSpeakingChange(false);
+              speakingTimeoutRef.current = null;
+            }, SILENCE_HANGOVER_MS);
+          }
         }
 
         animationFrameId = requestAnimationFrame(checkAudioLevel);
@@ -64,6 +88,7 @@ export function useAudioAnalyser(
 
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (speakingTimeoutRef.current) clearTimeout(speakingTimeoutRef.current);
       if (source) source.disconnect();
       if (audioContext && audioContext.state !== 'closed') {
         audioContext.close();

@@ -19,7 +19,7 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-full: 50%;
-  --transition: all 0.15s ease-in-out;
+  --transition: all 0.2s ease;
 }
 
 * {
@@ -270,11 +270,18 @@ body {
   gap: 10px;
   padding: 8px;
   border-radius: var(--radius-sm);
+  border: 1px solid transparent;
   transition: var(--transition);
 }
 
 .participant-item:hover {
   background-color: var(--bg-modifier-hover);
+}
+
+/* Destaque quando o participante está falando na lista */
+.participant-item.speaking {
+  background-color: rgba(35, 165, 90, 0.15);
+  border-color: var(--success);
 }
 
 .avatar-wrapper {
@@ -288,11 +295,13 @@ body {
   justify-content: center;
   font-weight: 700;
   color: #ffffff;
+  border: 2px solid transparent;
   transition: var(--transition);
 }
 
-/* Anel de Indicador de Fala estilo Discord */
+/* Indicador de Fala com Borda Verde Estilo Discord */
 .avatar-wrapper.speaking {
+  border-color: var(--success);
   box-shadow: 0 0 0 3px var(--success);
 }
 
@@ -408,6 +417,7 @@ body {
   height: 160px;
   background-color: var(--bg-secondary);
   border-radius: var(--radius-md);
+  border: 2px solid transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -416,8 +426,10 @@ body {
   transition: var(--transition);
 }
 
+/* Borda Verde marcante no Card de Voz ao falar */
 .voice-card.speaking {
-  box-shadow: 0 0 0 2px var(--success);
+  border-color: var(--success);
+  box-shadow: 0 0 12px rgba(35, 165, 90, 0.4);
 }
 
 /* Barra de Controles Inferior Estilo Discord */

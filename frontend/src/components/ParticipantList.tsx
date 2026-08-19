@@ -34,7 +34,7 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({
       </div>
 
       {allUsers.map((user) => (
-        <div key={user.socketId} className="participant-item">
+        <div key={user.socketId} className={`participant-item ${user.isSpeaking && !user.isMuted ? 'speaking' : ''}`}>
           <div className={`avatar-wrapper ${user.isSpeaking && !user.isMuted ? 'speaking' : ''}`}>
             {user.username.charAt(0).toUpperCase()}
             {user.isMuted && (
