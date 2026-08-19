@@ -13,4 +13,6 @@ dist
 .vscode
 .idea
 .vite
+backend/tests/*.js
+
 
