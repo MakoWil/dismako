@@ -53,8 +53,10 @@ export async function getRoomController(req: AuthenticatedRequest, res: Response
     return;
   }
 
+  const queryParam = Array.isArray(roomIdOrCode) ? roomIdOrCode[0] : String(roomIdOrCode);
+
   // Tenta em memória primeiro
-  const inMemoryRoom = activeRoomsInMemory.get(roomIdOrCode);
+  const inMemoryRoom = activeRoomsInMemory.get(queryParam);
   if (inMemoryRoom) {
     res.json({ room: inMemoryRoom });
     return;
@@ -64,8 +66,8 @@ export async function getRoomController(req: AuthenticatedRequest, res: Response
     const room = await prisma.room.findFirst({
       where: {
         OR: [
-          { id: roomIdOrCode },
-          { code: roomIdOrCode }
+          { id: queryParam },
+          { code: queryParam }
         ]
       }
     });
