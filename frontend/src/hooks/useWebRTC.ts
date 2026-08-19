@@ -27,6 +27,9 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
   const screenShareStreamRef = useRef(screenShareStream);
   screenShareStreamRef.current = screenShareStream;
 
+  const localAudioStreamRef = useRef(localAudioStream);
+  localAudioStreamRef.current = localAudioStream;
+
   // Mapeamento de RTCPeerConnections por socketId
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteStreams = useRef<Map<string, MediaStream>>(new Map());
@@ -48,6 +51,21 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
     };
   }, []);
 
+  // Quando o stream de áudio local carrega, vincular às conexões peer existentes
+  useEffect(() => {
+    if (localAudioStream) {
+      peerConnections.current.forEach(pc => {
+        localAudioStream.getTracks().forEach(track => {
+          const senders = pc.getSenders();
+          const hasTrack = senders.some(sender => sender.track === track);
+          if (!hasTrack) {
+            pc.addTrack(track, localAudioStream);
+          }
+        });
+      });
+    }
+  }, [localAudioStream]);
+
   // Criar RTCPeerConnection para um usuário remoto
   const createPeerConnection = useCallback(
     (targetSocketId: string, isInitiator: boolean) => {
@@ -58,10 +76,11 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
       const pc = new RTCPeerConnection(RTC_CONFIG);
       peerConnections.current.set(targetSocketId, pc);
 
+      const audioStream = localAudioStreamRef.current;
       // Adicionar tracks de áudio local ao peer connection
-      if (localAudioStream) {
-        localAudioStream.getTracks().forEach(track => {
-          pc.addTrack(track, localAudioStream);
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => {
+          pc.addTrack(track, audioStream);
         });
       }
 
@@ -82,7 +101,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
         }
       };
 
-      // Receber stream remoto
+      // Receber stream remoto (áudio / vídeo)
       pc.ontrack = event => {
         const [remoteStream] = event.streams;
         if (remoteStream) {
@@ -119,7 +138,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, currentUser: Us
 
       return pc;
     },
-    [localAudioStream, socket]
+    [socket]
   );
 
   // Efeito principal de tratamento de eventos via Socket.io

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Room, User } from '../types';
 import { getSocket } from '../services/socket';
 import { useWebRTC } from '../hooks/useWebRTC';
@@ -6,6 +6,7 @@ import { useAudioAnalyser } from '../hooks/useAudioAnalyser';
 import { ParticipantList } from './ParticipantList';
 import { VideoGrid } from './VideoGrid';
 import { Controls } from './Controls';
+import { AudioPlayer } from './AudioPlayer';
 
 interface VoiceRoomProps {
   user: User;
@@ -48,6 +49,11 @@ export const VoiceRoom: React.FC<VoiceRoomProps> = ({ user, room, onLeaveRoom })
 
   return (
     <div className="room-layout">
+      {/* Executores de Áudio Remotos nos Alto-falantes */}
+      {participants.map(p => (
+        <AudioPlayer key={p.socketId} participant={p} />
+      ))}
+
       {/* Sidebar com Dados da Sala e Participantes */}
       <div className="sidebar">
         <div className="sidebar-header">
