@@ -3,6 +3,9 @@
 # Etapa 1: Build
 FROM node:20-alpine AS builder
 
+# Instalar dependências nativas para Prisma / OpenSSL no Alpine
+RUN apk add --no-cache openssl libc6-compat
+
 WORKDIR /app
 
 # Copiar arquivos de configuração de pacotes
@@ -17,7 +20,7 @@ RUN cd frontend && npm ci
 COPY backend ./backend
 COPY frontend ./frontend
 
-# Compilar Backend
+# Compilar Backend (gera cliente Prisma nativo)
 RUN cd backend && npm run build
 
 # Compilar Frontend
@@ -25,6 +28,9 @@ RUN cd frontend && npm run build
 
 # Etapa 2: Produção
 FROM node:20-alpine AS runner
+
+# Instalar bibliotecas de suporte a OpenSSL e musl para o Prisma na VPS (ARM64 / x86_64)
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
@@ -37,7 +43,7 @@ COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/node_modules ./node_modules
 
-# Copiar build do frontend estático para a pasta pública servida pelo backend (ou servida de forma estática)
+# Copiar build do frontend estático para a pasta pública
 COPY --from=builder /app/frontend/dist ./public
 
 EXPOSE 4000
